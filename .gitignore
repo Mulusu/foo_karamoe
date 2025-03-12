@@ -1,3 +1,20 @@
+# Visual Studio and build file
+.vs
+Debug
+Release
+x64
+Win32
+
+# Foobar SDK files
+foobar2000
+libPPUI
+pfc
+sdk-license.txt
+sdk-readme.html
+
+# Test foobar
+test-foobar
+
 # Prerequisites
 *.d
 
