@@ -78,7 +78,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Create</PrecompiledHeader>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(SolutionDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)foobar2000;$(SolutionDir)foobar2000/SDK;$(SolutionDir)pfc;$(SolutionDir)libPPUI;</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -86,9 +86,10 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
       <AdditionalDependencies>$(CoreLibraryDependencies);$(SolutionDir)foobar2000/shared/shared-$(PlatformName).lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>/d2notypeopt %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <PostBuildEvent>
-      <Command>copy "$(TargetPath)" "$(SolutionDir)test-foobar\components\"</Command>
+      <Command>copy "$(TargetPath)" "$(SolutionDir)test-foobar\components\" /y</Command>
     </PostBuildEvent>
     <PostBuildEvent>
       <Message>Copying plugin to test foobar</Message>
@@ -104,7 +105,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Create</PrecompiledHeader>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(SolutionDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)foobar2000;$(SolutionDir)foobar2000/SDK;$(SolutionDir)pfc;$(SolutionDir)libPPUI;</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -114,9 +115,10 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
       <AdditionalDependencies>$(CoreLibraryDependencies);$(SolutionDir)foobar2000/shared/shared-$(PlatformName).lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>/d2notypeopt %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <PostBuildEvent>
-      <Command>copy "$(TargetPath)" "$(SolutionDir)test-foobar\components\"</Command>
+      <Command>copy "$(TargetPath)" "$(SolutionDir)test-foobar\components\" /y</Command>
     </PostBuildEvent>
     <PostBuildEvent>
       <Message>Copying plugin to test foobar</Message>
@@ -130,7 +132,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Create</PrecompiledHeader>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(SolutionDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)foobar2000;$(SolutionDir)foobar2000/SDK;$(SolutionDir)pfc;$(SolutionDir)libPPUI;</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -138,9 +140,10 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
       <AdditionalDependencies>$(CoreLibraryDependencies);$(SolutionDir)foobar2000/shared/shared-$(PlatformName).lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>/d2notypeopt %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <PostBuildEvent>
-      <Command>copy "$(TargetPath)" "$(SolutionDir)test-foobar\components\"</Command>
+      <Command>copy "$(TargetPath)" "$(SolutionDir)test-foobar\components\" /y</Command>
     </PostBuildEvent>
     <PostBuildEvent>
       <Message>Copying plugin to test foobar</Message>
@@ -156,7 +159,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Create</PrecompiledHeader>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(SolutionDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)foobar2000;$(SolutionDir)foobar2000/SDK;$(SolutionDir)pfc;$(SolutionDir)libPPUI;</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -166,19 +169,25 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
       <AdditionalDependencies>$(CoreLibraryDependencies);$(SolutionDir)foobar2000/shared/shared-$(PlatformName).lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>/d2notypeopt %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <PostBuildEvent>
-      <Command>copy "$(TargetPath)" "$(SolutionDir)test-foobar\components\"</Command>
+      <Command>copy "$(TargetPath)" "$(SolutionDir)test-foobar\components\" /y</Command>
     </PostBuildEvent>
     <PostBuildEvent>
       <Message>Copying plugin to test foobar</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="foo_karamoe.h" />
+    <ClInclude Include="json.hpp" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="foo_karamoe.cpp" />
+    <ClCompile Include="fs_swapper.cpp" />
+    <ClCompile Include="mem_fs.cpp" />
+    <ClCompile Include="search_ui.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\foobar2000\foobar2000_component_client\foobar2000_component_client.vcxproj">
@@ -186,6 +195,9 @@
     </ProjectReference>
     <ProjectReference Include="..\foobar2000\SDK\foobar2000_SDK.vcxproj">
       <Project>{e8091321-d79d-4575-86ef-064ea1a4a20d}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\libPPUI\libPPUI.vcxproj">
+      <Project>{7729eb82-4069-4414-964b-ad399091a03f}</Project>
     </ProjectReference>
     <ProjectReference Include="..\pfc\pfc.vcxproj">
       <Project>{ebfffb4e-261d-44d3-b89c-957b31a0bf9c}</Project>
