@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include <iostream>
+#include "json.hpp"
 #include <foobar2000/helpers/foobar2000+atl.h>
 #include <foobar2000/helpers/atl-misc.h>
 #include <libPPUI/win32_op.h>
@@ -7,6 +8,10 @@
 #include <libPPUI/CEditWithButtons.h>
 #include <libPPUI/CListControlSimple.h>
 #include "foo_karamoe.h"
+#include <iomanip>
+#include <sstream>
+#include <Windows.h>
+#include <foobar2000/SDK/foobar2000-pfc.h>
 
 namespace foo_karamoe {
 
@@ -159,7 +164,11 @@ namespace foo_karamoe {
             t_ui_font fontDefault = m_callback->query_font_ex(ui_font_default);
             t_ui_font fontLists = m_callback->query_font_ex(ui_font_lists);
             if (m_edit.m_hWnd && fontDefault) {
-                m_edit.SendMessage(WM_SETFONT, (WPARAM)fontDefault, TRUE);
+                LOGFONT lf = {};
+                GetObject(fontDefault, sizeof(lf), &lf);
+                lf.lfHeight = lf.lfHeight * 1.2;
+                t_ui_font hNewFont = CreateFontIndirect(&lf);
+                m_edit.SendMessage(WM_SETFONT, (WPARAM)hNewFont, TRUE);
             }
             if (m_list.m_hWnd && fontLists) {
                 m_list.SendMessage(WM_SETFONT, (WPARAM)fontLists, TRUE);
@@ -180,10 +189,10 @@ namespace foo_karamoe {
                     m_statusIcon.SetWindowTextW(emoji);
                 }
                 else {
-                    wchar_t emoji[] = { m_searchStatus, 0 };
+                    wchar_t emoji[] = { (wchar_t)m_searchStatus, 0 };
                     m_statusIcon.SetWindowTextW(emoji);
                 }
-                });
+            });
         }
 
         LRESULT OnRightClick(UINT, WPARAM wparam, LPARAM lParam, BOOL&) {
@@ -218,7 +227,7 @@ namespace foo_karamoe {
                 Kara* selected = (Kara*)m_list.GetItemUserData(selectedItem);
                 SetSearchStatus(Save);
                 // Queueing involves downloading the files --> do in worker thread
-                fb2k::inCpuWorkerThread([this, selected] {
+                fb2k::inWorkerThread([this, selected] {
                     QueueSong(selected);
                     SetSearchStatus(Done);
                 });
@@ -273,9 +282,272 @@ namespace foo_karamoe {
                 m_list.SetItemUserData(rowIndex, (size_t)kara);
                 });
         }
+
+        std::string parseNames(std::vector<nlohmann::json> data) {
+            std::string name;
+            for (nlohmann::json item : data) {
+                if (!name.empty()) {
+                    name += ", ";
+                }
+                name += item["name"];
+            }
+            return name;
+        }
+
+        file::ptr http_get(std::string& url, abort_callback& p_abort) {
+            http_request::ptr req = http_client::get()->create_request("GET");
+            file::ptr data = req->run(url.c_str(), p_abort);
+            return data;
+        }
+
+        std::vector<Kara*> search(const pfc::string8& query) {
+            std::string url = KaramoeUrl::api + "karas/search?filter=" + url_encode(query);
+            console::print(url.c_str());
+            file::ptr data = http_get(url, fb2k::noAbort);
+            pfc::string8 result;
+            data->read_string_raw(result, fb2k::noAbort);
+            nlohmann::json json_data = nlohmann::json::parse(result.toString());
+            std::vector<Kara*> results;
+
+            if (json_data.contains("content")) {
+                std::vector<nlohmann::json> content = json_data["content"];
+                for (nlohmann::json song : content) {
+                    Kara* kara = new Kara;
+                    try {
+                        // Name
+                        kara->insert({ NAME , song["songname"] });
+
+                        // Title
+                        std::string def_lang = song["titles_default_language"];
+                        kara->insert({ TITLE, song["titles"][def_lang] });
+
+                        // Duration
+                        int duration = song["duration"];
+                        int minutes = duration / 60;
+                        int seconds = duration % 60;
+                        kara->insert({ LENGTH, std::to_string(minutes) + (seconds < 10 ? ":0" : ":") + std::to_string(seconds) });
+
+                        // Songtype
+                        std::string songtypes = parseNames(song["songtypes"]);
+                        std::string misc = parseNames(song["misc"]);
+                        std::string versions = parseNames(song["versions"]);
+                        std::string types = "";
+                        types += (!types.empty() && !versions.empty() ? ", " : "") + versions;
+                        types += (!types.empty() && !songtypes.empty() ? ", " : "") + songtypes;
+                        types += (!types.empty() && !misc.empty() ? ", " : "") + misc;
+                        kara->insert({ TYPE, types });
+
+                        // Creators
+                        kara->insert({ SINGER, parseNames(song["singers"]) });
+                        kara->insert({ WRITER, parseNames(song["songwriters"]) });
+
+                        // Lang
+                        kara->insert({ LANG, parseNames(song["langs"]) });
+
+                        // Franchise
+                        kara->insert({ FRANCHISE, parseNames(song["series"]) });
+
+                        // Mediafiles
+                        kara->insert({ MEDIAFILE, song["mediafile"] });
+                        kara->insert({ HS_MEDIAFILE, song["hardsubbed_mediafile"] });
+                        if (song.contains("lyrics_infos")) {
+                            for (nlohmann::json option : song["lyrics_infos"]) {
+                                if (option["default"]) {
+                                    kara->insert({ SUBFILE, option["filename"] });
+                                    break;
+                                }
+                            }
+                        }
+                        else if (song.contains("subfile")) {
+                            kara->insert({ SUBFILE, song["subfile"] });
+                        }
+                        else {
+                            console::print("ERROR: No lyric files found. Ignoring song.");
+                            delete kara;
+                            continue;
+                        }
+
+                        // Loudnorm
+                        kara->insert({ LOUDNORM, song["loudnorm"] });
+
+                        results.push_back(kara);
+                    }
+                    catch (std::exception e) {
+                        console::print("Error with karamoe search result: ", e.what());
+                        delete kara;
+                        continue;
+                    }
+                }
+            }
+            return results;
+        }
+
+        std::string url_encode(const pfc::string8& raw) {
+            std::string escaped;
+            for (unsigned int i = 0; i < raw.get_length(); i++) {
+                char c = raw[i];
+                if (isalnum((unsigned char)c) || c == '-' || c == '_' || c == '.' || c == '~') {
+                    escaped += c;
+                }
+                else if (c == ' ') {
+                    escaped += "%20";
+                }
+                else {
+                    escaped += '%';
+                    char hex[3];
+                    sprintf_s(hex, sizeof(hex), "%02X", (unsigned char)c);
+                    escaped += hex;
+                }
+            }
+            return escaped;
+        }
+
+
+        void make_temp_folder() {
+            const std::string dirPath = core_api::get_profile_path() + fileDir;
+            auto fs = filesystem::get(dirPath.c_str());
+            if (fs->directory_exists(dirPath.c_str(), fb2k::noAbort)) {
+                fs->remove_directory_content(dirPath.c_str(), fb2k::noAbort);
+            }
+            else {
+                fs->make_directory(dirPath.c_str(), fb2k::noAbort);
+            }
+        }
+
+        bool write_to_disk(file::ptr sourceFile, std::string path) {
+            try {
+                t_filesize size = sourceFile->get_size(fb2k::noAbort);
+                file::ptr targetFile;
+                filesystem::g_open_write_new(targetFile, path.c_str(), fb2k::noAbort);
+                //targetFile->resize(size, fb2k::noAbort);
+                sourceFile->g_transfer_file(sourceFile, targetFile, fb2k::noAbort);
+                return true;
+            }
+            catch (const std::exception& e) {
+                console::print("Error dumping file: ", e.what());
+                SetSearchStatus(Error);
+            }
+            return false;
+        }
+
+        // Returns the file path adjusted for the name of the kara, and if the file already exists
+        std::pair<std::string, bool> make_filepath(std::string name, std::string file) {
+            try {
+                // Replace windows forbidden symbols
+                const std::string forbidden = R"(<>:"/\|?*)";
+                std::replace_if(name.begin(), name.end(), [&](char c) { return forbidden.find(c) != std::string::npos; }, '_');
+
+                const std::string dirPath = core_api::get_profile_path() + fileDir;
+                auto fs = filesystem::get(dirPath.c_str());
+                std::string filepath = dirPath + name + "." + fs->get_extension(file.c_str()).toString();
+                bool exists = fs->file_exists(filepath.c_str(), fb2k::noAbort);
+                return std::make_pair(filepath, exists);
+            }
+            catch (std::exception& e) {
+                console::print("Error getting filepaths: ", e.what());
+                return std::make_pair("", false);
+            }
+        }
+
+        void QueueSong(Kara* karaPtr) {
+            Kara kara = *karaPtr;
+            std::pair<std::string, bool> mediaFile;
+            std::pair<std::string, bool> subFile;
+            metadb_handle_ptr mediahandle;
+
+            bool use_hs = filesystem::g_get_extension(kara[MEDIAFILE].c_str()) != "mp4";
+            bool use_url = false;
+            /*
+                    bool use_mem = false;
+
+                    if (use_mem) {
+                        std::string path = "MEMFILE://" + kara[HS_MEDIAFILE];
+                        mediahandle = metadb::get()->handle_create(path.c_str(), 0);
+
+                        fb2k::inMainThread([mediahandle] {
+                            try {
+                                static_api_ptr_t<playlist_manager> plm;
+                                plm->queue_add_item(mediahandle);
+                                playback_control::ptr pbc = playback_control::get();
+                                if (plm->queue_get_count() == 1 && !pbc->is_playing() && !pbc->is_paused()) {
+                                    pbc->start();  // Only item in queue, not playing, not paused... just play it
+                                }
+                            }
+                            catch (...) {
+                                console::print("ERROR: Failed to queue");
+                            }
+                        });
+                        return;
+                    }
+                */
+
+            if (!use_url) {
+                if (!use_hs) {
+                    mediaFile = make_filepath(kara[NAME], kara[MEDIAFILE]);
+                    subFile = make_filepath(kara[NAME], kara[SUBFILE]);
+                }
+                else {
+                    mediaFile = make_filepath(kara[NAME], kara[HS_MEDIAFILE]);
+                }
+
+                // If the file doesn't already exist, download it from karamoe and dump to disk
+                if (!mediaFile.second) {
+                    SetSearchStatus(Download);
+                    std::string mediaUrl = !use_hs ? KaramoeUrl::media_dl + kara[MEDIAFILE] : KaramoeUrl::hardsub_dl + kara[HS_MEDIAFILE];
+                    std::string lyricUrl = KaramoeUrl::lyric_dl + kara[SUBFILE];
+
+                    file::ptr media = http_get(mediaUrl, fb2k::noAbort);
+                    file::ptr lyrics = http_get(lyricUrl, fb2k::noAbort);
+
+                    SetSearchStatus(Save);
+                    write_to_disk(media, mediaFile.first);
+                    write_to_disk(lyrics, subFile.first);
+
+                    // Write tags
+                    service_ptr_t<input_info_writer> writer;
+                    file::ptr tagFile;
+                    input_entry::g_open_for_info_write(writer, tagFile, mediaFile.first.c_str(), fb2k::noAbort);
+                    file_info_impl info;
+                    float i, tp, lra, measured_thresh, offset;
+                    sscanf_s(kara[LOUDNORM].c_str(), "%f, %f, %f, %f, %f", &i, &tp, &lra, &measured_thresh, &offset);
+                    float gain = REPLAY_GAIN_LUFT_TARGET - i;
+                    float peak = (float)std::pow(10, (tp / 20));
+
+                    info.meta_set("ARTIST", kara[SINGER].c_str());
+                    info.meta_set("ALBUM", kara[FRANCHISE].c_str());
+                    info.meta_set("TITLE", kara[TITLE].c_str());
+                    info.info_set_replaygain_track_gain(gain);
+                    info.info_set_replaygain_track_peak(peak);
+
+                    writer->set_info(0, info, fb2k::noAbort);
+                    writer->commit(fb2k::noAbort);
+                }
+                mediahandle = metadb::get()->handle_create(mediaFile.first.c_str(), 0);
+            }
+            else {
+                mediahandle = metadb::get()->handle_create((KaramoeUrl::hardsub_dl + kara[HS_MEDIAFILE]).c_str(), 0);
+            }
+
+            // Playlist manipulation is unsafe in non-main thread
+            fb2k::inMainThread([mediahandle] {
+                try {
+                    static_api_ptr_t<playlist_manager> plm;
+                    plm->queue_add_item(mediahandle);
+                    playback_control::ptr pbc = playback_control::get();
+                    if (plm->queue_get_count() == 1 && !pbc->is_playing() && !pbc->is_paused()) {
+                        pbc->start();  // Only item in queue, not playing, not paused... just play it
+                    }
+                }
+                catch (...) {
+                    console::print("ERROR: Failed to queue");
+                }
+            });
+            SetSearchStatus(Done);
+        }
     };
 
     // Register the ui element to foobar
     class karamoe_ui_impl : public ui_element_impl<SearchUI> {};
     static service_factory_single_t<karamoe_ui_impl> g_karamoe_factory;
+
 }

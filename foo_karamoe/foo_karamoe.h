@@ -28,13 +28,15 @@ namespace foo_karamoe {
 		LENGTH,
 		TYPE,
 		FRANCHISE,
+		LOUDNORM,
 		MEDIAFILE,
 		SUBFILE,
 		HS_MEDIAFILE
 	};
 
-	const int SEARCH_BAR_HEIGHT = 25;
-	const int SEARCH_STATUS_WIDTH = 28;
+	const int SEARCH_BAR_HEIGHT = 30;
+	const int SEARCH_STATUS_WIDTH = SEARCH_BAR_HEIGHT;
+	const float REPLAY_GAIN_LUFT_TARGET = -18;
 
 	class ResultCol {
 	public:
@@ -46,12 +48,12 @@ namespace foo_karamoe {
 	};
 
 	const static std::vector<ResultCol> rows{
-			ResultCol(75, "Language", LANG),
 			ResultCol(200, "Title", TITLE),
 			ResultCol(200, "Singer", SINGER),
 			ResultCol(200, "Writer", WRITER),
 			ResultCol(200, "Franchise", FRANCHISE),
 			ResultCol(200, "Type", TYPE),
+			ResultCol(75, "Language", LANG),
 			ResultCol(75, "Length", LENGTH)
 	};
 
@@ -74,13 +76,4 @@ namespace foo_karamoe {
 	};
 
 	typedef std::unordered_map<KaraField, std::string> Kara;
-
-	void QueueSongMem(Kara*);
-	void QueueSong(Kara*);
-	std::vector<Kara*> search(const pfc::string8&);
-	file::ptr http_get(std::string&, abort_callback&);
-	std::string url_encode(const pfc::string8&);
-	void make_temp_folder();
-	bool write_to_disk(file::ptr, std::string);
-	std::pair<std::string, bool> make_filepath(std::string, std::string);
 }

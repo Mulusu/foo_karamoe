@@ -7,8 +7,8 @@ namespace {
     **/
     class FSSwapper : public initquit, private play_callback {
     private:
-        HWND m_audioWindow;
-        HWND m_videoWindow;
+        HWND m_audioWindow = NULL;
+        HWND m_videoWindow = NULL;
         metadb_handle_ptr m_last;  // In case a window hasn't changed its name on song change, it might be found by the last
     public:
         void on_init() {

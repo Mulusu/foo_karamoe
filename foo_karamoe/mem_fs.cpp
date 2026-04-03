@@ -1,7 +1,9 @@
+
 #include "stdafx.h"
 #include "foo_karamoe.h"
 #include <sstream>
 #include <iomanip>
+/*
 
 namespace foo_karamoe {
 	class KaraContainer : public playback_queue_callback {
@@ -33,6 +35,12 @@ namespace foo_karamoe {
 
 	class mem_fs : public filesystem {
 		const std::string m_prefix = "MEMFILE://";
+
+		file::ptr http_get(std::string& url, abort_callback& p_abort) {
+			http_request::ptr req = http_client::get()->create_request("GET");
+			file::ptr data = req->run(url.c_str(), p_abort);
+			return data;
+		}
 
 		bool get_canonical_path(const char* in, pfc::string_base& out) override { 
 			console::print("get canonical path: ", in);
@@ -126,3 +134,4 @@ namespace foo_karamoe {
 
 	//FB2K_SERVICE_FACTORY(mem_fs);
 }
+*/
