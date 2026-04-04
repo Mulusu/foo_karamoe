@@ -94,11 +94,11 @@ namespace foo_karamoe {
             int width = LOWORD(lParam);
             int height = HIWORD(lParam);
             m_edit.SetWindowPos(nullptr,
-                0, 0, max(width - SEARCH_STATUS_WIDTH, 0), SEARCH_BAR_HEIGHT,
+                SEARCH_STATUS_WIDTH, 0, width, SEARCH_BAR_HEIGHT,
                 0
             );
             m_statusIcon.SetWindowPos(nullptr,
-                width - SEARCH_STATUS_WIDTH, 0, width, SEARCH_BAR_HEIGHT,
+                0 , 0, SEARCH_STATUS_WIDTH, SEARCH_BAR_HEIGHT,
                 0
             );
             m_list.SetWindowPos(nullptr,
@@ -250,7 +250,7 @@ namespace foo_karamoe {
         LRESULT OnTimer(UINT, WPARAM, LPARAM, BOOL&) {
             KillTimer(TIMER_DEBOUNCE);
             SetSearchStatus(InProgress);
-            pfc::string8 query = uGetWindowText(m_edit);
+            std::string query = uGetWindowText(m_edit).toString();
             ClearResultList();
             // Might take a moment to work, queue to worker thread to not freeze UI
             fb2k::inWorkerThread([this, query] {
@@ -294,14 +294,21 @@ namespace foo_karamoe {
             return name;
         }
 
-        file::ptr http_get(std::string& url, abort_callback& p_abort) {
+        file::ptr http_get(std::string url, abort_callback& p_abort) {
             http_request::ptr req = http_client::get()->create_request("GET");
             file::ptr data = req->run(url.c_str(), p_abort);
             return data;
         }
 
-        std::vector<Kara*> search(const pfc::string8& query) {
-            std::string url = KaramoeUrl::api + "karas/search?filter=" + url_encode(query);
+        std::vector<Kara*> search(const std::string& query) {
+            std::string filter = "filter=" + url_encode(query);
+            std::string collections = "collections=" + 
+                url_encode(Collection::asia) +
+                url_encode("," + Collection::geek) + 
+                url_encode("," + Collection::non_latin) + 
+                url_encode("," + Collection::shitpost) +
+                url_encode("," + Collection::west);
+            std::string url = KaramoeUrl::api + "karas/search?" + filter + "&" + collections;
             console::print(url.c_str());
             file::ptr data = http_get(url, fb2k::noAbort);
             pfc::string8 result;
@@ -370,6 +377,12 @@ namespace foo_karamoe {
                         // Loudnorm
                         kara->insert({ LOUDNORM, song["loudnorm"] });
 
+                        // Collections
+                        kara->insert({ COLLECTIONS, parseNames(song["collections"]) });
+
+                        // Warnings
+                        kara->insert({ WARNINGS, parseNames(song["warnings"]) });
+
                         results.push_back(kara);
                     }
                     catch (std::exception e) {
@@ -382,9 +395,9 @@ namespace foo_karamoe {
             return results;
         }
 
-        std::string url_encode(const pfc::string8& raw) {
+        std::string url_encode(const std::string& raw) {
             std::string escaped;
-            for (unsigned int i = 0; i < raw.get_length(); i++) {
+            for (unsigned int i = 0; i < raw.length(); i++) {
                 char c = raw[i];
                 if (isalnum((unsigned char)c) || c == '-' || c == '_' || c == '.' || c == '~') {
                     escaped += c;
@@ -419,7 +432,7 @@ namespace foo_karamoe {
                 t_filesize size = sourceFile->get_size(fb2k::noAbort);
                 file::ptr targetFile;
                 filesystem::g_open_write_new(targetFile, path.c_str(), fb2k::noAbort);
-                //targetFile->resize(size, fb2k::noAbort);
+                targetFile->resize(size, fb2k::noAbort);
                 sourceFile->g_transfer_file(sourceFile, targetFile, fb2k::noAbort);
                 return true;
             }
@@ -435,7 +448,9 @@ namespace foo_karamoe {
             try {
                 // Replace windows forbidden symbols
                 const std::string forbidden = R"(<>:"/\|?*)";
-                std::replace_if(name.begin(), name.end(), [&](char c) { return forbidden.find(c) != std::string::npos; }, '_');
+                std::replace_if(name.begin(), name.end(), [&](char c) {
+                    return forbidden.find(c) != std::string::npos; 
+                }, '_');
 
                 const std::string dirPath = core_api::get_profile_path() + fileDir;
                 auto fs = filesystem::get(dirPath.c_str());
@@ -457,29 +472,6 @@ namespace foo_karamoe {
 
             bool use_hs = filesystem::g_get_extension(kara[MEDIAFILE].c_str()) != "mp4";
             bool use_url = false;
-            /*
-                    bool use_mem = false;
-
-                    if (use_mem) {
-                        std::string path = "MEMFILE://" + kara[HS_MEDIAFILE];
-                        mediahandle = metadb::get()->handle_create(path.c_str(), 0);
-
-                        fb2k::inMainThread([mediahandle] {
-                            try {
-                                static_api_ptr_t<playlist_manager> plm;
-                                plm->queue_add_item(mediahandle);
-                                playback_control::ptr pbc = playback_control::get();
-                                if (plm->queue_get_count() == 1 && !pbc->is_playing() && !pbc->is_paused()) {
-                                    pbc->start();  // Only item in queue, not playing, not paused... just play it
-                                }
-                            }
-                            catch (...) {
-                                console::print("ERROR: Failed to queue");
-                            }
-                        });
-                        return;
-                    }
-                */
 
             if (!use_url) {
                 if (!use_hs) {
@@ -496,17 +488,6 @@ namespace foo_karamoe {
                     std::string mediaUrl = !use_hs ? KaramoeUrl::media_dl + kara[MEDIAFILE] : KaramoeUrl::hardsub_dl + kara[HS_MEDIAFILE];
                     std::string lyricUrl = KaramoeUrl::lyric_dl + kara[SUBFILE];
 
-                    file::ptr media = http_get(mediaUrl, fb2k::noAbort);
-                    file::ptr lyrics = http_get(lyricUrl, fb2k::noAbort);
-
-                    SetSearchStatus(Save);
-                    write_to_disk(media, mediaFile.first);
-                    write_to_disk(lyrics, subFile.first);
-
-                    // Write tags
-                    service_ptr_t<input_info_writer> writer;
-                    file::ptr tagFile;
-                    input_entry::g_open_for_info_write(writer, tagFile, mediaFile.first.c_str(), fb2k::noAbort);
                     file_info_impl info;
                     float i, tp, lra, measured_thresh, offset;
                     sscanf_s(kara[LOUDNORM].c_str(), "%f, %f, %f, %f, %f", &i, &tp, &lra, &measured_thresh, &offset);
@@ -516,11 +497,35 @@ namespace foo_karamoe {
                     info.meta_set("ARTIST", kara[SINGER].c_str());
                     info.meta_set("ALBUM", kara[FRANCHISE].c_str());
                     info.meta_set("TITLE", kara[TITLE].c_str());
-                    info.info_set_replaygain_track_gain(gain);
-                    info.info_set_replaygain_track_peak(peak);
 
-                    writer->set_info(0, info, fb2k::noAbort);
-                    writer->commit(fb2k::noAbort);
+                    // Loudnorm is for non hs file, might differ
+                    if (!use_hs) {
+                        info.info_set_replaygain_track_gain(gain);
+                        info.info_set_replaygain_track_peak(peak);
+                    }
+
+                    fb2k::inWorkerThread([this, use_hs, mediaUrl, lyricUrl, mediaFile, subFile, info] {
+                        file::ptr media = http_get(mediaUrl, fb2k::noAbort);
+                        file::ptr lyrics;
+                        if (!use_hs) {
+                            lyrics = http_get(lyricUrl, fb2k::noAbort);
+                        }
+
+                        SetSearchStatus(Save);
+                        write_to_disk(media, mediaFile.first);
+                        if (!use_hs) {
+                            write_to_disk(lyrics, subFile.first);
+                        }
+
+                        // Write tags
+                        service_ptr_t<input_info_writer> writer;
+                        file::ptr tagFile;
+                        input_entry::g_open_for_info_write(writer, tagFile, mediaFile.first.c_str(), fb2k::noAbort);
+                        writer->set_info(0, info, fb2k::noAbort);
+                        writer->commit(fb2k::noAbort);
+
+                        SetSearchStatus(Done);
+                    });
                 }
                 mediahandle = metadb::get()->handle_create(mediaFile.first.c_str(), 0);
             }
@@ -534,15 +539,11 @@ namespace foo_karamoe {
                     static_api_ptr_t<playlist_manager> plm;
                     plm->queue_add_item(mediahandle);
                     playback_control::ptr pbc = playback_control::get();
-                    if (plm->queue_get_count() == 1 && !pbc->is_playing() && !pbc->is_paused()) {
-                        pbc->start();  // Only item in queue, not playing, not paused... just play it
-                    }
                 }
                 catch (...) {
                     console::print("ERROR: Failed to queue");
                 }
             });
-            SetSearchStatus(Done);
         }
     };
 

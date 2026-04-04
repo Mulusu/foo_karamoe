@@ -16,6 +16,14 @@ namespace foo_karamoe {
 		inline static std::string hardsub_dl = "https://kara.moe/hardsubs/";
 	};
 
+	struct Collection {
+		inline static std::string asia = "dbcf2c22-524d-4708-99bb-601703633927";
+		inline static std::string geek = "c7db86a0-ff64-4044-9be4-66dd1ef1d1c1";
+		inline static std::string shitpost = "f2462778-f986-4844-a4b8-e1d3ccdb861b";
+		inline static std::string non_latin = "2fa2fe3f-bb56-45ee-aa38-eae60e76f224";
+		inline static std::string west = "efe171c0-e8a1-4d03-98c0-60ecf741ad52";
+	};
+
 	inline static const std::string fileDir = "\\karamoe_temp\\";
 #define DEBOUNCE_WAIT 750    // Wait after typing stops before search is fired, ms
 
@@ -31,7 +39,9 @@ namespace foo_karamoe {
 		LOUDNORM,
 		MEDIAFILE,
 		SUBFILE,
-		HS_MEDIAFILE
+		HS_MEDIAFILE,
+		COLLECTIONS,
+		WARNINGS
 	};
 
 	const int SEARCH_BAR_HEIGHT = 30;
@@ -48,16 +58,20 @@ namespace foo_karamoe {
 	};
 
 	const static std::vector<ResultCol> rows{
+		// The columns are put in the order defined here
 			ResultCol(200, "Title", TITLE),
 			ResultCol(200, "Singer", SINGER),
 			ResultCol(200, "Writer", WRITER),
 			ResultCol(200, "Franchise", FRANCHISE),
 			ResultCol(200, "Type", TYPE),
 			ResultCol(75, "Language", LANG),
-			ResultCol(75, "Length", LENGTH)
+			ResultCol(75, "Length", LENGTH),
+			ResultCol(200, "Collections", COLLECTIONS),
+			ResultCol(200, "Warnings", WARNINGS)
 	};
 
 	enum SearchStatus {
+		// Numbers are the unicode number of the emoji used to indicate that status
 		Idle = 0x1F4A4,
 		Waiting = 0x23f3,
 		InProgress = 0x1F50D,

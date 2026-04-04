@@ -67,7 +67,8 @@ namespace {
                 const file_info& info = p_track->get_full_info_ref(fb2k::noAbort)->info();
                 std::string title = info.meta_exists("title") ? info.meta_get("title", 0) : fb2k::filename(p_track->get_path()).toString();
                 std::string artist = info.meta_exists("artist") ? info.meta_get("artist", 0) : "?";
-                std::string windowName = title + " - " + artist;
+                std::string album = info.meta_exists("album") ? info.meta_get("album", 0) : "";
+                std::string windowName = title + " - " + artist + (!album.empty() ? " (" + album + ")" : "");
                 std::wstring wide_name(windowName.begin(), windowName.end());
                 return wide_name;
             }
