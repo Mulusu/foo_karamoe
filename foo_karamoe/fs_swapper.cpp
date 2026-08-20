@@ -18,20 +18,28 @@ namespace foo_fsswap {
 
         std::vector<std::function<void(boolean enabled, boolean hasVideo, boolean hasAudio)>> listeners;
 
+        void register_self() {
+            play_callback_manager::get()->register_callback(this, play_callback::flag_on_playback_new_track, true);
+        }
+
+        void unregister_self() {
+            play_callback_manager::get()->unregister_callback(this);
+        }
+
     public:
 
         void on_init() {
             console::print("Window swapper initialized");
             if (cfg_enabled) {
                 console::print("...As active");
-                play_callback_manager::get()->register_callback(this, play_callback::flag_on_playback_new_track, true);
+                register_self();
                 FindWindows();
             }
         }
 
         void on_quit() {
             if (cfg_enabled) {
-                play_callback_manager::get()->unregister_callback(this);
+                unregister_self();
             }
         }
 
@@ -43,12 +51,12 @@ namespace foo_fsswap {
             cfg_enabled = !cfg_enabled;
             if (cfg_enabled) {
                 console::print("FSSwap active");
-                play_callback_manager::get()->register_callback(this, play_callback::flag_on_playback_new_track, true);
+                register_self();
                 FindWindows();
             }
             else {
                 console::print("FSSwap Disabled");
-                play_callback_manager::get()->unregister_callback(this);
+                unregister_self();
             }
         }
 
@@ -79,23 +87,52 @@ namespace foo_fsswap {
             popup_message_v3::query_t q;
             if (m_audioWindow != NULL && m_videoWindow != NULL) {
                 q.title = "Success";
-                q.msg = "Both windows found successfully\nWill automatically swap between video and audio lyric panels on song change";
-                q.buttons = popup_message_v3::buttonOK;
+                if (cfg_enabled) {
+                    q.msg = "Both windows found successfully\nWill automatically swap between video and audio lyric panels on song change";
+                    q.buttons = popup_message_v3::buttonOK;
+                }
+                else {
+                    q.msg = "Both windows found successfully\nHowever, the service is turned off.\nWant to turn it on now?";
+                    q.buttons = popup_message_v3::buttonYes | popup_message_v3::buttonNo;
+                    q.reply = fb2k::makeCompletionNotify([this] (unsigned result) {
+                        switch (result) {
+                        case popup_message_v3::buttonYes:
+                            cfg_enabled = true;
+                            register_self();
+                            break;
+                        case popup_message_v3::buttonNo:
+                            break;
+                        }
+                    });
+                }
                 q.icon = popup_message_v3::iconInformation;
             }
             else {
                 q.title = "Window swapper error";
                 q.icon = popup_message_v3::iconError;
-                q.buttons = popup_message_v3::buttonOK | popup_message_v3::buttonRetry | popup_message_v3::buttonAbort;
+                q.buttons = popup_message_v3::buttonIgnore | popup_message_v3::buttonRetry | popup_message_v3::buttonAbort;
                 if (m_audioWindow != NULL) {
-                    q.msg = "Failed to find video window\nAutomatic swapping between video and audio lyric panels might not work";
+                    q.msg = "Failed to find video window\nAutomatic swapping between video and audio lyric panels might not work\nIgnore to leave the service on\nRetry to try again now\nAbort to turn the service off";
                 }
                 else if (m_videoWindow != NULL) {
-                    q.msg = "Failed to find audio window\nAutomatic swapping between video and audio lyric panels might not work";
+                    q.msg = "Failed to find audio window\nAutomatic swapping between video and audio lyric panels might not work\nIgnore to leave the service on\nRetry to try again now\nAbort to turn the service off";
                 }
                 else {
-                    q.msg = "Failed to find either window\nAutomatic swapping between video and audio lyric panels might not work";
+                    q.msg = "Failed to find either window\nAutomatic swapping between video and audio lyric panels might not work\nIgnore to leave the service on\nRetry to try again now\nAbort to turn the service off";
                 }
+                q.reply = fb2k::makeCompletionNotify([this](unsigned result) {
+                    switch (result) {
+                    case popup_message_v3::buttonIgnore:
+                        break;
+                    case popup_message_v3::buttonRetry:
+                        FindWindows();
+                        break;
+                    case popup_message_v3::buttonAbort:
+                        cfg_enabled = false;
+                        unregister_self();
+                        break;
+                    }
+                });
             }
             q.show();
         }
