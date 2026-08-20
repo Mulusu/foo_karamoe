@@ -29,13 +29,7 @@
     <ClCompile Include="foo_karamoe.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="search_ui.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="fs_swapper.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="mem_fs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

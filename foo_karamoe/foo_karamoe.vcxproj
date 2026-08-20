@@ -186,8 +186,6 @@
   <ItemGroup>
     <ClCompile Include="foo_karamoe.cpp" />
     <ClCompile Include="fs_swapper.cpp" />
-    <ClCompile Include="mem_fs.cpp" />
-    <ClCompile Include="search_ui.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\foobar2000\foobar2000_component_client\foobar2000_component_client.vcxproj">

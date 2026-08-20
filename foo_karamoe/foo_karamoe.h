@@ -31,7 +31,7 @@ namespace foo_karamoe {
 		NAME,
 		TITLE,
 		LANG,
-		SINGER,
+		ARTIST,
 		WRITER,
 		LENGTH,
 		TYPE,
@@ -60,7 +60,7 @@ namespace foo_karamoe {
 	const static std::vector<ResultCol> rows{
 		// The columns are put in the order defined here
 			ResultCol(200, "Title", TITLE),
-			ResultCol(200, "Singer", SINGER),
+			ResultCol(200, "Band / Singer", ARTIST),
 			ResultCol(200, "Writer", WRITER),
 			ResultCol(200, "Franchise", FRANCHISE),
 			ResultCol(200, "Type", TYPE),
@@ -79,6 +79,10 @@ namespace foo_karamoe {
 		Download = 0x1F4E1,
 		Save = 0x1F4BE,
 		Error = 0x26A0
+	};
+
+	const static std::vector<SearchStatus> statusBarIcons = {
+		Idle, Waiting, InProgress, Download, Save, Done, Error
 	};
 
 	struct Colors {
