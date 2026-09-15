@@ -179,13 +179,19 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="foo_karamoe.h" />
     <ClInclude Include="json.hpp" />
+    <ClInclude Include="karamoe_service.h" />
+    <ClInclude Include="resource.h" />
+    <ClInclude Include="search_ui.h" />
     <ClInclude Include="stdafx.h" />
+    <ClInclude Include="foo_window_swapper.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="foo_karamoe.cpp" />
-    <ClCompile Include="fs_swapper.cpp" />
+    <ClCompile Include="foo_karamoe_ui.cpp" />
+    <ClCompile Include="foo_window_swapper.cpp" />
+    <ClCompile Include="foo_window_swapper_preferences.cpp" />
+    <ClCompile Include="karamoe_service.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\foobar2000\foobar2000_component_client\foobar2000_component_client.vcxproj">
@@ -200,6 +206,9 @@
     <ProjectReference Include="..\pfc\pfc.vcxproj">
       <Project>{ebfffb4e-261d-44d3-b89c-957b31a0bf9c}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="resource.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -21,7 +21,16 @@
     <ClInclude Include="json.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="foo_karamoe.h">
+    <ClInclude Include="foo_window_swapper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="search_ui.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="karamoe_service.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -29,8 +38,22 @@
     <ClCompile Include="foo_karamoe.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="fs_swapper.cpp">
+    <ClCompile Include="foo_window_swapper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="foo_window_swapper_preferences.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="foo_karamoe_ui.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="karamoe_service.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="resource.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>

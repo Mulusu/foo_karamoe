@@ -1,22 +1,15 @@
 #include "stdafx.h"
-#include <foobar2000/helpers/foobar2000+atl.h>
-#include <foobar2000/helpers/atl-misc.h>
-#include <foobar2000/helpers/readers.h>
 
-namespace foo_fsswap {
+#include "foo_window_swapper.h"
+#include <sstream>
 
-    const GUID guid_enabled = { 0x6b70f7d5, 0xd379, 0x450a, { 0x86, 0xf3, 0x59, 0x8a, 0xa, 0xf0, 0xde, 0xbd } };
-    const GUID fs_swap_menu_group_guid = { 0x80934b3b, 0x9bd, 0x40cb, { 0x98, 0x73, 0x62, 0x81, 0x55, 0x1f, 0x2c, 0xbb } };
+namespace foo_window_swapper {
 
-    class FSSwapper : public initquit, private play_callback {
+    class WindowSwapper : public initquit, private play_callback {
 
     private:
-        cfg_bool cfg_enabled = cfg_bool(guid_enabled, true);
-
-        HWND m_audioWindow = NULL;
-        HWND m_videoWindow = NULL;
-
-        std::vector<std::function<void(boolean enabled, boolean hasVideo, boolean hasAudio)>> listeners;
+        HWND m_defaultWindow = NULL;
+        HWND m_altWindow = NULL;
 
         void register_self() {
             play_callback_manager::get()->register_callback(this, play_callback::flag_on_playback_new_track, true);
@@ -29,33 +22,31 @@ namespace foo_fsswap {
     public:
 
         void on_init() {
-            console::print("Window swapper initialized");
-            if (cfg_enabled) {
-                console::print("...As active");
+            if (Configs::enabled) {
                 register_self();
                 FindWindows();
             }
         }
 
         void on_quit() {
-            if (cfg_enabled) {
+            if (Configs::enabled) {
                 unregister_self();
             }
         }
 
         bool IsActive() {
-            return cfg_enabled;
+            return Configs::enabled;
         }
 
         void Toggle() {
-            cfg_enabled = !cfg_enabled;
-            if (cfg_enabled) {
-                console::print("FSSwap active");
+            Configs::enabled = !Configs::enabled;
+            if (Configs::enabled) {
+                console::print("Window Swapper active");
                 register_self();
                 FindWindows();
             }
             else {
-                console::print("FSSwap Disabled");
+                console::print("Window Swapper Disabled");
                 unregister_self();
             }
         }
@@ -64,63 +55,81 @@ namespace foo_fsswap {
             metadb_handle_ptr playing;
             static_api_ptr_t<playback_control>()->get_now_playing(playing);
 
-            if (m_videoWindow == NULL || !IsWindow(m_videoWindow)) {
-                std::wstring windowName = getVideoWindowName(playing);
+            if (m_altWindow == NULL || !IsWindow(m_altWindow)) {
+                std::wstring windowName = getWindowName(ALT, playing);
                 if (windowName.empty()) {
-                    m_videoWindow = NULL;
+                    m_altWindow = NULL;
                 }
                 else {
-                    m_videoWindow = FindWindow(NULL, windowName.c_str());
+                    m_altWindow = FindWindow(NULL, windowName.c_str());
                 }
             }
 
-            if (m_audioWindow == NULL || !IsWindow(m_audioWindow)) {
-                std::wstring windowName = getAudioWindowName(playing);
+            if (m_defaultWindow == NULL || !IsWindow(m_defaultWindow)) {
+                std::wstring windowName = getWindowName(DEFAULT, playing);
                 if (windowName.empty()) {
-                    m_audioWindow = NULL;
+                    m_defaultWindow = NULL;
                 }
                 else {
-                    m_audioWindow = FindWindow(NULL, windowName.c_str());
+                    m_defaultWindow = FindWindow(NULL, windowName.c_str());
                 }
             }
 
             popup_message_v3::query_t q;
-            if (m_audioWindow != NULL && m_videoWindow != NULL) {
+            if (m_defaultWindow != NULL && m_altWindow != NULL) {
                 q.title = "Success";
-                if (cfg_enabled) {
+                if (Configs::enabled) {
                     q.msg = "Both windows found successfully\nWill automatically swap between video and audio lyric panels on song change";
                     q.buttons = popup_message_v3::buttonOK;
                 }
                 else {
                     q.msg = "Both windows found successfully\nHowever, the service is turned off.\nWant to turn it on now?";
                     q.buttons = popup_message_v3::buttonYes | popup_message_v3::buttonNo;
-                    q.reply = fb2k::makeCompletionNotify([this] (unsigned result) {
+                    q.reply = fb2k::makeCompletionNotify([this](unsigned result) {
                         switch (result) {
                         case popup_message_v3::buttonYes:
-                            cfg_enabled = true;
+                            Configs::enabled = true;
                             register_self();
                             break;
                         case popup_message_v3::buttonNo:
                             break;
                         }
-                    });
+                        });
                 }
                 q.icon = popup_message_v3::iconInformation;
             }
             else {
                 q.title = "Window swapper error";
                 q.icon = popup_message_v3::iconError;
-                q.buttons = popup_message_v3::buttonIgnore | popup_message_v3::buttonRetry | popup_message_v3::buttonAbort;
-                if (m_audioWindow != NULL) {
-                    q.msg = "Failed to find video window\nAutomatic swapping between video and audio lyric panels might not work\nIgnore to leave the service on\nRetry to try again now\nAbort to turn the service off";
+                q.buttons = popup_message_v3::buttonIgnore | popup_message_v3::buttonRetry;
+
+                std::string not_found;
+                if (m_defaultWindow != NULL) {
+                    not_found = "Failed to find alt window";
                 }
-                else if (m_videoWindow != NULL) {
-                    q.msg = "Failed to find audio window\nAutomatic swapping between video and audio lyric panels might not work\nIgnore to leave the service on\nRetry to try again now\nAbort to turn the service off";
+                else if (m_altWindow != NULL) {
+                    not_found = "Failed to find default window";
                 }
                 else {
-                    q.msg = "Failed to find either window\nAutomatic swapping between video and audio lyric panels might not work\nIgnore to leave the service on\nRetry to try again now\nAbort to turn the service off";
+                    not_found = "Failed to find either window";
                 }
-                q.reply = fb2k::makeCompletionNotify([this](unsigned result) {
+
+                std::string not_working = "Automatic swapping between windows might not work";
+
+                std::string status;
+                if (Configs::enabled) {
+                    q.buttons |= popup_message_v3::buttonAbort;
+                    status = "Abort to turn the service off";
+                }
+                else {
+                    status = "Service is currently off";
+                }
+
+                // New pointer to keep the underlying string alive until message is no longer needed
+                std::string* message = new std::string(not_found + "\n" + not_working + "\n" + status);
+                q.msg = message->c_str();
+
+                q.reply = fb2k::makeCompletionNotify([this, message](unsigned result) {
                     switch (result) {
                     case popup_message_v3::buttonIgnore:
                         break;
@@ -128,10 +137,11 @@ namespace foo_fsswap {
                         FindWindows();
                         break;
                     case popup_message_v3::buttonAbort:
-                        cfg_enabled = false;
+                        Configs::enabled = false;
                         unregister_self();
                         break;
                     }
+                    delete message;
                 });
             }
             q.show();
@@ -155,20 +165,29 @@ namespace foo_fsswap {
                 auto fs = filesystem::get(path.c_str());
                 std::string ext = fs->get_extension(path.c_str()).toString();
 
-                bool is_video = ext == "mp4";
+                bool is_alt = false;
+                std::string alt_extensions = Configs::alt_files.get_value().toString();
+                std::istringstream iss(alt_extensions);
+                std::string alt_ext;
+                while (iss >> alt_ext) {
+                    if (alt_ext == ext) {
+                        is_alt = true;
+                        break;
+                    }
+                }
 
-                if (!IsWindow(is_video ? m_videoWindow : m_audioWindow)) {
+                if (!IsWindow(is_alt ? m_altWindow : m_defaultWindow)) {
                     // No window yet
                     std::wstring wanted;
-                    if (is_video) {
-                        m_videoWindow = findAndFocusWindow(getVideoWindowName(p_track));
+                    if (is_alt) {
+                        m_altWindow = findAndFocusWindow(getWindowName(ALT, p_track));
                     }
                     else {
-                        m_audioWindow = findAndFocusWindow(getAudioWindowName(p_track));
+                        m_defaultWindow = findAndFocusWindow(getWindowName(DEFAULT, p_track));
                     }
                 }
                 else {
-                    focusWindow(is_video ? m_videoWindow : m_audioWindow);
+                    focusWindow(is_alt ? m_altWindow : m_defaultWindow);
                 }
             }
             catch (std::exception e) {
@@ -177,23 +196,29 @@ namespace foo_fsswap {
             }
         }
 
-        std::wstring getAudioWindowName(metadb_handle_ptr& p_track) {
-            // TODO: actually handle different names, for now hardcoded
-            return L"ESLyric";
-        }
 
-        std::wstring getVideoWindowName(metadb_handle_ptr& p_track) {
+        std::wstring getWindowName(Window window, metadb_handle_ptr& p_track) {
             try {
                 if (p_track == nullptr) {
                     return L"";
                 }
-                const file_info& info = p_track->get_full_info_ref(fb2k::noAbort)->info();
-                std::string title = info.meta_exists("title") ? info.meta_get("title", 0) : fb2k::filename(p_track->get_path()).toString();
-                std::string artist = info.meta_exists("artist") ? info.meta_get("artist", 0) : "?";
-                std::string album = info.meta_exists("album") ? info.meta_get("album", 0) : "";
-                std::string windowName = title + " - " + artist + (!album.empty() ? " (" + album + ")" : "");
-                std::wstring wide_name(windowName.begin(), windowName.end());
-                return wide_name;
+
+                auto pattern = (window == DEFAULT) ? Configs::default_pattern.get_value() : Configs::alt_pattern.get_value();
+                service_ptr_t<titleformat_object> script;
+                static_api_ptr_t<titleformat_compiler> compiler;
+                if (!compiler->compile(script, pattern)) {
+                    return L"";
+                }
+                pfc::string8 result;
+                p_track->format_title(
+                    NULL,
+                    result,
+                    script,
+                    NULL
+                );
+                std::string name = result.toString();
+                pfc::stringcvt::string_wide_from_utf8 wide_name(result);
+                return wide_name.get_ptr();
             }
             catch (std::exception& e) {
                 console::print(e.what());
@@ -220,33 +245,21 @@ namespace foo_fsswap {
         }
 
     };
-   static service_factory_single_t<FSSwapper> g_fs_swapper_initquit;
+    static service_factory_single_t<WindowSwapper> g_window_swapper_initquit;
 
 
 
-    class FSSwapMenuGroup : public mainmenu_group_popup {
+    class WindowSwapperMenuGroup : public mainmenu_group_popup {
     public:
-        GUID get_guid() {
-            return fs_swap_menu_group_guid;
-        }
-
-        GUID get_parent() {
-            return mainmenu_groups::view;
-        }
-
-        t_uint32 get_sort_priority() {
-            return -99;
-        }
-
-        void get_display_string(pfc::string_base& p_out) {
-            p_out = "Window Swapper";
-        }
+        GUID get_guid() { return window_swapper_menu_group_guid; }
+        GUID get_parent() { return mainmenu_groups::view; }
+        t_uint32 get_sort_priority() { return -99; }
+        void get_display_string(pfc::string_base& p_out) { p_out = "Window Swapper"; }
     };
-    static service_factory_single_t<FSSwapMenuGroup> g_fs_swapper_menu_group;
+    static service_factory_single_t<WindowSwapperMenuGroup> g_window_swapper_menu_group;
 
 
-
-    class FSSwapMenu : public mainmenu_commands {
+    class WindowSwapperMenu : public mainmenu_commands {
 
     public:
 
@@ -276,8 +289,7 @@ namespace foo_fsswap {
         bool get_display(t_uint32 p_index, pfc::string_base& p_text, t_uint32& p_flags) override {
             switch (p_index) {
             case cmd_activate_toggle:
-
-                if (g_fs_swapper_initquit.get_static_instance().IsActive()) {
+                if (g_window_swapper_initquit.get_static_instance().IsActive()) {
                     p_flags = mainmenu_commands::flag_checked;
                     get_name(p_index, p_text);
                 }
@@ -287,10 +299,9 @@ namespace foo_fsswap {
                 return true;
             case cmd_find_windows:
                 get_name(p_index, p_text);
-                break;
-            default:
-                return false;
+                return true;
             }
+            return false;
         }
 
 
@@ -307,7 +318,7 @@ namespace foo_fsswap {
         }
 
         GUID get_parent() override {
-            return fs_swap_menu_group_guid;
+            return window_swapper_menu_group_guid;
         }
 
         bool get_description(unsigned p_index, pfc::string_base& p_out) {
@@ -327,13 +338,13 @@ namespace foo_fsswap {
         void execute(t_uint32 p_index, ctx_t p_callback) {
             switch (p_index) {
             case cmd_activate_toggle:
-                g_fs_swapper_initquit.get_static_instance().Toggle();
+                g_window_swapper_initquit.get_static_instance().Toggle();
                 break;
             case cmd_find_windows:
-                g_fs_swapper_initquit.get_static_instance().FindWindows();
+                g_window_swapper_initquit.get_static_instance().FindWindows();
                 break;
             }
         }
     };
-    static mainmenu_commands_factory_t<FSSwapMenu> g_fs_swapper_command;
+    static mainmenu_commands_factory_t<WindowSwapperMenu> g_window_swapper_command;
 }
