@@ -1,7 +1,6 @@
 #pragma once
 #include "stdafx.h"
 #include "json.hpp"
-#include "search_ui.h"
 
 namespace foo_karamoe {
 
@@ -45,22 +44,19 @@ namespace foo_karamoe {
 	class KaramoeService {
 	public:
 		KaramoeService();
-		void make_temp_folder();
 
 		nlohmann::json search(const std::string& query);
 		std::vector<Kara*> parse_karas(nlohmann::json& search_results);
 
-		std::pair<std::string, std::string> prepare_files(Kara kara);
-		file_info_impl queue_file(Kara kara, std::string& file_path);
-		std::pair<file::ptr, file::ptr> download_files(Kara kara);
-		bool write_to_disk(file::ptr sourceFile, std::string path);
-		void write_tags(file_info_impl info, std::string filepath);
+		std::pair<std::string, std::string> prepare_files(const Kara &kara);
+		file_info_impl queue_file(const Kara &kara, std::string& file_path);
+		std::pair<file::ptr, file::ptr> download_files(const Kara &kara);
+		bool write_to_disk(file::ptr &sourceFile, std::string &path);
+		void write_tags(file_info_impl &info, std::string &filepath);
 
 	private:
-		file::ptr http_get(std::string url, abort_callback& p_abort);
-		std::pair<std::string, bool> make_filepath(std::string name, std::string file);
+		file::ptr http_get(std::string& url, abort_callback& p_abort);
 		std::string url_encode(const std::string& raw);
-		std::string parseNames(nlohmann::json data, std::string field);
-
+		std::string parseNames(nlohmann::json &data, const char* field);
 	};
 }

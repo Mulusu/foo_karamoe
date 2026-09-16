@@ -182,7 +182,6 @@
     <ClInclude Include="json.hpp" />
     <ClInclude Include="karamoe_service.h" />
     <ClInclude Include="resource.h" />
-    <ClInclude Include="search_ui.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="foo_window_swapper.h" />
   </ItemGroup>

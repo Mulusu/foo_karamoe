@@ -1,8 +1,10 @@
 #include "stdafx.h"
 #include "foo_window_swapper.h"
-#include "helpers/atl-misc.h"
+#include <foobar2000/helpers/foobar2000+atl.h>
+#include <helpers/atl-misc.h>
 #include <SDK/coreDarkMode.h>
 #include "resource.h"
+
 
 
 namespace foo_window_swapper {
@@ -51,17 +53,6 @@ namespace foo_window_swapper {
                 state |= preferences_state::changed;
             }
             return state;
-        }
-
-        pfc::string8 get_text_from_dlg_item(int item) {
-            int len = GetDlgItemTextW(item, nullptr, 0);
-            std::wstring wtext(len + 1, L'\0');
-            GetDlgItemTextW(item, wtext.data(), len + 1);
-
-            uGetDlgItemText(m_hWnd, item);
-            pfc::stringcvt::string_utf8_from_wide text(wtext.c_str());
-            pfc::string8 retval = text.toString();
-            return retval;
         }
 
         void apply() override {

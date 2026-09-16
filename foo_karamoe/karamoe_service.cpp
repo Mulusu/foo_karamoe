@@ -1,12 +1,10 @@
 #include "stdafx.h"
 #include "karamoe_service.h"
-#include "json.hpp"
 
 namespace foo_karamoe {
 
-    KaramoeService::KaramoeService() {}
-
-    void KaramoeService::make_temp_folder() {
+    KaramoeService::KaramoeService() {
+        // Make temp folder
         const std::string dirPath = core_api::get_profile_path() + fileDir;
         auto fs = filesystem::get(dirPath.c_str());
         if (fs->directory_exists(dirPath.c_str(), fb2k::noAbort)) {
@@ -17,7 +15,8 @@ namespace foo_karamoe {
         }
     }
 
-    bool KaramoeService::write_to_disk(file::ptr sourceFile, std::string path) {
+
+    bool KaramoeService::write_to_disk(file::ptr &sourceFile, std::string &path) {
         try {
             t_filesize size = sourceFile->get_size(fb2k::noAbort);
             file::ptr targetFile;
@@ -137,14 +136,14 @@ namespace foo_karamoe {
     }
  
 
-    file::ptr KaramoeService::http_get(std::string url, abort_callback& p_abort) {
+    file::ptr KaramoeService::http_get(std::string &url, abort_callback& p_abort) {
         http_request::ptr req = http_client::get()->create_request("GET");
         file::ptr data = req->run(url.c_str(), p_abort);
         return data;
     }
 
 
-    std::string KaramoeService::parseNames(nlohmann::json data, std::string field) {
+    std::string KaramoeService::parseNames(nlohmann::json &data, const char* field) {
         std::string name = "";
         if (!data.contains(field)) {
             return name;
@@ -181,17 +180,17 @@ namespace foo_karamoe {
     }
 
 
-    bool should_use_hs(Kara &kara) {
-        return filesystem::g_get_extension(kara[MEDIAFILE].c_str()) != "mp4";
+    bool should_use_hs(const Kara &kara) {
+        return filesystem::g_get_extension(kara.at(MEDIAFILE).c_str()) != "mp4";
     }
 
 
-    /** Prepare the file. Touches the file (does NOT download!), sets tags, loudnorm, etc, or does nothing if file already exists*/
-    std::pair<std::string, std::string> KaramoeService::prepare_files(Kara kara) {
+    /** Returns the eventual file paths for the kara. Does NOT download anything yet */
+    std::pair<std::string, std::string> KaramoeService::prepare_files(const Kara &kara) {
         std::pair<std::string, std::string> files;
 
         // Replace windows forbidden symbols
-        std::string name = kara[NAME];
+        std::string name = kara.at(NAME);
         const std::string forbidden = R"(<>:"/\|?*)";
         std::replace_if(name.begin(),
             name.end(),
@@ -208,20 +207,20 @@ namespace foo_karamoe {
     }
 
 
-    file_info_impl KaramoeService::queue_file(Kara kara, std::string &file_path) {
+    file_info_impl KaramoeService::queue_file(const Kara &kara, std::string &file_path) {
         metadb_handle_ptr mediahandle;
         mediahandle = metadb::get()->handle_create(file_path.c_str(), 0);
 
         // Prepare metadata
         file_info_impl info;
         float i, tp, lra, measured_thresh, offset;
-        sscanf_s(kara[LOUDNORM].c_str(), "%f, %f, %f, %f, %f", &i, &tp, &lra, &measured_thresh, &offset);
+        sscanf_s(kara.at(LOUDNORM).c_str(), "%f, %f, %f, %f, %f", &i, &tp, &lra, &measured_thresh, &offset);
         float gain = REPLAY_GAIN_LUFT_TARGET - i;
         float peak = (float)std::pow(10, (tp / 20));
 
-        info.meta_set("ARTIST", kara[ARTIST].c_str());
-        info.meta_set("ALBUM", kara[FRANCHISE].c_str());
-        info.meta_set("TITLE", kara[TITLE].c_str());
+        info.meta_set("ARTIST", kara.at(ARTIST).c_str());
+        info.meta_set("ALBUM", kara.at(FRANCHISE).c_str());
+        info.meta_set("TITLE", kara.at(TITLE).c_str());
 
         // Loudnorm is for non hs file, might differ
         if (!should_use_hs(kara)) {
@@ -250,7 +249,7 @@ namespace foo_karamoe {
         return info;  // Return info so the same data can be ACTUALLY be written on the file, currently only in queued handle
     }
 
-    void KaramoeService::write_tags(file_info_impl info, std::string filepath) {
+    void KaramoeService::write_tags(file_info_impl &info, std::string &filepath) {
         service_ptr_t<input_info_writer> writer;
         file::ptr tagFile;
         input_entry::g_open_for_info_write(writer, tagFile, filepath.c_str(), fb2k::noAbort);
@@ -258,10 +257,10 @@ namespace foo_karamoe {
         writer->commit(fb2k::noAbort);
     }
 
-    std::pair<file::ptr, file::ptr> KaramoeService::download_files(Kara kara) {
+    std::pair<file::ptr, file::ptr> KaramoeService::download_files(const Kara &kara) {
         bool use_hs = should_use_hs(kara);
-        std::string mediaUrl = !use_hs ? KaramoeUrl::media_dl + kara[MEDIAFILE] : KaramoeUrl::hardsub_dl + kara[HS_MEDIAFILE];
-        std::string lyricUrl = KaramoeUrl::lyric_dl + kara[SUBFILE];
+        std::string mediaUrl = !use_hs ? KaramoeUrl::media_dl + kara.at(MEDIAFILE) : KaramoeUrl::hardsub_dl + kara.at(HS_MEDIAFILE);
+        std::string lyricUrl = KaramoeUrl::lyric_dl + kara.at(SUBFILE);
 
         file::ptr media = http_get(mediaUrl, fb2k::noAbort);
         file::ptr lyrics = nullptr;

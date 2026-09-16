@@ -1,11 +1,5 @@
 #pragma once
 #include "stdafx.h"
-#include <foobar2000/helpers/foobar2000+atl.h>
-#include <foobar2000/helpers/readers.h>
-#include <libPPUI/CEditWithButtons.h>
-
-#include <helpers/advconfig_impl.h>
-#include <SDK/cfg_var.h>
 
 namespace foo_window_swapper {
 

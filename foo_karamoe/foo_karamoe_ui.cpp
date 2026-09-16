@@ -4,17 +4,27 @@
 #include <foobar2000/helpers/CListControlFb2kColors.h>
 #include <libPPUI/CEditWithButtons.h>
 #include <libPPUI/CListControlSimple.h>
-#include <foobar2000/SDK/foobar2000-pfc.h>
-#include <libPPUI/win32_op.h>
 #include <SDK/coreDarkMode.h>
-
-#include <iostream>
-
-#include "search_ui.h"
 #include "karamoe_service.h"
 
 namespace foo_karamoe {
-#define TIMER_DEBOUNCE 1001  // Id for our timer
+
+    enum SearchStatus {
+        // Numbers are the unicode number of the emoji used to indicate that status
+        Idle = 0x1F4A4,         // System is idle
+        Waiting = 0x23f3,       // Waiting for typing debounce timer to fire search
+        Network = 0x1F4E1,      // HTTP search query or download underway
+        Parsing = 0x1F50D,      // Parsing response of the HTTP search query
+        Done = 0x2705,          // Search / Queueing+download is done
+        Filing = 0x1F4DD,       // Preparing files
+        Save = 0x1F4BE,         // Saving files to filesystem
+        Error = 0x26A0          // Operation failed
+    };
+
+    const int ID_TIMER_DEBOUNCE = 1001;  // Id for typing debounce timer
+    const int DEBOUNCE_WAIT_TIME = 750;  // Wait after typing stops before search is fired, ms
+    const int SEARCH_BAR_HEIGHT = 30;
+    const int SEARCH_STATUS_WIDTH = SEARCH_BAR_HEIGHT;
 
 
     class ResultCol {
@@ -39,21 +49,13 @@ namespace foo_karamoe {
         ResultCol(200, "Warnings", WARNINGS)
     };
 
-	struct Colors {
-		CBrush Brush;
-		COLORREF Bg{};
-		COLORREF Text{};
-		COLORREF SelBg{};
-		COLORREF SelText{};
-	};
 
-	class KaramoeUI_impl : public ui_element_instance, public CWindowImpl<KaramoeUI_impl>, public SearchUI {
+	class KaramoeUI_impl : public ui_element_instance, public CWindowImpl<KaramoeUI_impl> {
     private:
         KaramoeService* m_service;
         ui_element_instance_callback::ptr m_callback;
         ui_element_config::ptr m_config;
         SearchStatus m_searchStatus;
-        Colors m_colors;
         CEditWithButtons m_edit;
         CListControlFb2kColors<CListControlSimple> m_list;
 
@@ -73,16 +75,16 @@ namespace foo_karamoe {
         void set_configuration(ui_element_config::ptr config) { m_config = config; }
         ui_element_config::ptr get_configuration() { return m_config; }
 
+
         BEGIN_MSG_MAP(KaramoeUI_impl)
             MESSAGE_HANDLER(WM_CREATE, OnCreate)
             MESSAGE_HANDLER(WM_SIZE, OnSize)
             MESSAGE_HANDLER(WM_DESTROY, OnDestroy)
-            //MESSAGE_HANDLER(WM_CTLCOLOREDIT, OnColor)
-            //MESSAGE_HANDLER(WM_CTLCOLORSTATIC, OnColor)
             MESSAGE_HANDLER(WM_TIMER, OnTimer)
             COMMAND_CODE_HANDLER(EN_CHANGE, OnSearchChange)
             MESSAGE_HANDLER(WM_CONTEXTMENU, OnRightClick)
         END_MSG_MAP()
+
 
         KaramoeUI_impl(ui_element_config::ptr config, ui_element_instance_callback::ptr callback) {
             m_service = new KaramoeService();
@@ -92,15 +94,15 @@ namespace foo_karamoe {
                 // Set empty config, so position in layout can be saved by foobar
                 set_configuration(g_get_default_configuration());
             }
-            m_service->make_temp_folder();
         }
+
 
         void initialize_window(HWND parent) {
             WIN32_OP(Create(parent) != NULL);
         }
 
 
-        /* Create necesssary UI elements */
+        /* Create necessary UI elements */
         LRESULT OnCreate(UINT uint, WPARAM wparam, LPARAM lparam, BOOL & handled) {
             // Create the UI elements. Sizes left to nullptr, they are set in OnSize
             m_edit.Create(m_hWnd, nullptr, nullptr, WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL);
@@ -124,12 +126,13 @@ namespace foo_karamoe {
             for (ResultCol row : rows) {
                 m_list.AddColumn(row.m_label.c_str(), row.m_width);
             }
-            //ApplyFoobarColors();
 
+            // Tell foobar to manage the colors for darkmode
             m_dark.AddDialogWithControls(m_hWnd);
 
             return 0;
         }
+
 
         LRESULT OnSize(UINT, WPARAM, LPARAM lParam, BOOL&) {
             int width = LOWORD(lParam);
@@ -151,22 +154,6 @@ namespace foo_karamoe {
             return 0;
         }
 
-        /* Override windows default colors of the editable text field with foobar colors */
-        LRESULT OnColor(UINT, WPARAM wParam, LPARAM lParam, BOOL&) {
-            if ((HWND)lParam == m_edit.m_hWnd) {
-                HDC hdc = (HDC)wParam;
-                SetBkColor(hdc, m_colors.Bg);
-                SetTextColor(hdc, m_colors.Text);
-                return (LRESULT)m_colors.Brush.m_hBrush;
-            }
-            if ((HWND)lParam == m_statusIcon.m_hWnd) {
-                HDC hdc = (HDC)wParam;
-                SetBkColor(hdc, m_colors.Bg);
-                SetTextColor(hdc, m_colors.SelBg);
-                return (LRESULT)m_colors.Brush.m_hBrush;
-            }
-            return 0;
-        }
 
         void ClearResultList() {
             for (unsigned int i = 0; i < m_list.GetItemCount(); i++) {
@@ -175,8 +162,9 @@ namespace foo_karamoe {
             m_list.RemoveAllItems();
         }
 
+
         LRESULT OnSearchChange(WORD, WORD, HWND, BOOL&) {
-            KillTimer(TIMER_DEBOUNCE);  // Stop existing timer
+            KillTimer(ID_TIMER_DEBOUNCE);  // Stop existing timer
             pfc::string8 query;
             uGetWindowText(m_edit, query);
             if (query.get_length() == 0) {
@@ -185,39 +173,16 @@ namespace foo_karamoe {
                 return 0;
             }
             SetSearchStatus(Waiting);
-            SetTimer(TIMER_DEBOUNCE, DEBOUNCE_WAIT, nullptr);
+            SetTimer(ID_TIMER_DEBOUNCE, DEBOUNCE_WAIT_TIME, nullptr);
             return 0;
         }
+
 
         LRESULT OnDestroy(UINT, WPARAM, LPARAM lParam, BOOL&) {
-            KillTimer(TIMER_DEBOUNCE);
+            KillTimer(ID_TIMER_DEBOUNCE);
             return 0;
         }
 
-        void ApplyFoobarColors() {
-            m_colors.Bg = m_callback->query_std_color(ui_color_background);
-            m_colors.Text = m_callback->query_std_color(ui_color_text);
-            m_colors.SelBg = m_callback->query_std_color(ui_color_selection);
-            m_colors.SelText = m_callback->query_std_color(ui_color_highlight);
-
-            if (m_colors.Brush) { m_colors.Brush.DeleteObject(); }
-            m_colors.Brush.CreateSolidBrush(m_colors.Bg);
-
-            // Set fonts to match foobar themes
-            t_ui_font fontDefault = m_callback->query_font_ex(ui_font_default);
-            t_ui_font fontLists = m_callback->query_font_ex(ui_font_lists);
-            if (m_edit.m_hWnd && fontDefault) {
-                LOGFONT lf = {};
-                GetObject(fontDefault, sizeof(lf), &lf);
-                lf.lfHeight = lf.lfHeight * 1.2;
-                t_ui_font hNewFont = CreateFontIndirect(&lf);
-                m_edit.SendMessage(WM_SETFONT, (WPARAM)hNewFont, TRUE);
-            }
-            if (m_list.m_hWnd && fontLists) {
-                m_list.SendMessage(WM_SETFONT, (WPARAM)fontLists, TRUE);
-            }
-            Invalidate();
-        }
 
         void SetSearchStatus(SearchStatus status) {
             m_searchStatus = status;
@@ -237,6 +202,7 @@ namespace foo_karamoe {
                 }
                 });
         }
+
 
         LRESULT OnRightClick(UINT, WPARAM wparam, LPARAM lParam, BOOL&) {
             enum {ADD_TO_QUEUE = 1};
@@ -276,6 +242,7 @@ namespace foo_karamoe {
             return 0;
         }
 
+
         void queue_kara(Kara* selected) {
             Kara kara = *selected;
             // Queueing involves downloading the files --> do in worker thread
@@ -307,7 +274,7 @@ namespace foo_karamoe {
 
 
         LRESULT OnTimer(UINT, WPARAM, LPARAM, BOOL&) {
-            KillTimer(TIMER_DEBOUNCE);
+            KillTimer(ID_TIMER_DEBOUNCE);
             std::string query = uGetWindowText(m_edit).toString();
             ClearResultList();
             // Might take a moment to work, queue to worker thread to not freeze UI
@@ -333,7 +300,8 @@ namespace foo_karamoe {
             return 0;
         }
 
-        void AddResultRow(Kara * kara) {
+
+        void AddResultRow(Kara* kara) {
             // Altering UI, better do it in main
             fb2k::inMainThread([this, kara] {
                 size_t rowIndex = m_list.InsertItem(m_list.GetItemCount());

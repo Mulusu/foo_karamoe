@@ -24,9 +24,6 @@
     <ClInclude Include="foo_window_swapper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="search_ui.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="karamoe_service.h">
       <Filter>Header Files</Filter>
     </ClInclude>
