@@ -67,6 +67,7 @@ namespace foo_karamoe {
 
                 // Duration
                 int duration = song["duration"];
+                kara->duration = duration;
                 int minutes = duration / 60;
                 int seconds = duration % 60;
                 kara->insert({ LENGTH, std::to_string(minutes) + (seconds < 10 ? ":0" : ":") + std::to_string(seconds) });
@@ -221,6 +222,9 @@ namespace foo_karamoe {
         info.meta_set("ARTIST", kara.at(ARTIST).c_str());
         info.meta_set("ALBUM", kara.at(FRANCHISE).c_str());
         info.meta_set("TITLE", kara.at(TITLE).c_str());
+
+        // Set length so queue total length can be correctly calculated
+        info.set_length(kara.duration);
 
         // Loudnorm is for non hs file, might differ
         if (!should_use_hs(kara)) {

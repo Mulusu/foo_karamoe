@@ -39,7 +39,22 @@ namespace foo_karamoe {
 		WARNINGS
 	};
 
-	typedef std::unordered_map<KaraField, std::string> Kara;
+	struct Kara {
+		std::unordered_map<KaraField, std::string> data;
+		int duration;
+
+		std::string& operator[](KaraField key) {
+			return data[key];
+		}
+
+		std::string at(KaraField key) const {
+			return data.at(key);
+		}
+
+		void insert(std::pair<KaraField, std::string> value) {
+			data.insert(value);
+		}
+	};
 
 	class KaramoeService {
 	public:

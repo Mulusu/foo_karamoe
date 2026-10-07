@@ -4,7 +4,7 @@
 /* Declare plugin info to foobar */
 DECLARE_COMPONENT_VERSION(
 	"Karamoe Integration",
-	"1.0.1",
+	"1.0.2",
 	"Karaoke Mugen ( https://kara.moe ) Integration Plugin"
 );
 VALIDATE_COMPONENT_FILENAME("foo_karamoe.dll");
